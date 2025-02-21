@@ -54,17 +54,21 @@ namespace GetSignatureTest
     template <typename... A>
     struct FunctionH;
 
-    // template < typename T, typename... Ts, typename... TupleTupes>
-    // struct FunctionH<std::tuple<TupleTupes...>, T, Ts...>
-    // {
-    //     using type = std::function<Type<T, std::tuple<TupleTupes...>>()>;
-    // };
+    template <typename T, typename... Ts, typename... TupleTupes>
+    struct FunctionH<std::tuple<TupleTupes...>, T, Ts...>
+    {
+        using type = std::function<Type<T, std::tuple<TupleTupes...>>()>;
+    };
 
-    // template <template <size_t> typename R, size_t Ind, class... TupleTupes>
-    // struct FunctionH<std::tuple<TupleTupes...>, R<Ind>>
-    // {
-    //     using type = Type<TupleTupes...>::type (*hui)(void) > ;
-    // };
+    template <template <size_t> typename R, size_t Ind, class... TupleTupes>
+    struct FunctionH<std::tuple<TupleTupes...>, R<Ind>>
+    {
+        // using type = Type<TupleTupes...>::type (*hui)(void);
+        // using type = std::function<Type<TupleTupes...>::type()>;
+
+        using tmp = Type<TupleTupes...>::type;
+        using type = std::function<tmp()>;
+    };
 
     // template <size_t> class... Rs, size_t... Inds
 
@@ -82,76 +86,68 @@ namespace GetSignatureTest
 namespace GetTest
 {
     template <size_t Index>
-    struct Data;
+    struct Data
+    {
+    };
 
     template <size_t Index>
-    struct Value;
+    struct Value
+    {
+    };
 
     class Pukpuk
     {
     public:
         std::tuple<int, double, std::string> data = std::make_tuple(1, 4.5, "lol");
         std::tuple<double, std::string, size_t> value = std::make_tuple(5.4, "pupupu", 123456);
-
-        // template <size_t Ind>
-        // struct Get<Data<Ind>>
-        // {
-        //     auto get()
-        //     {
-        //         return std::get<Ind>(data);
-        //     }
-        // }
-
-        // template <template <size_t> class R, size_t Ind>
-        // auto get()
-        // {
-        //     // if (std::is_same_v<R<Ind>, Data<Ind>>)
-        //     // {
-        //     //     return std::get<Ind>(data);
-        //     // }
-        //     if constexpr (std::is_same_v<R<Ind>, Value<Ind>>)
-        //     {
-        //         return std::get<Ind>(value);
-        //     }
-        //     return std::get<Ind>(value);
-        // }
     };
 
     template <typename... A>
     struct Get;
 
     template <size_t Ind>
-    struct Get<Data<Ind>> : public Pukpuk
+    struct Get<Data<Ind>>
     {
-        auto operator()()
+        template <typename... DataTypes, typename... ValueTypes>
+        auto operator()(std::tuple<DataTypes...> &data, std::tuple<ValueTypes...> &value)
         {
-            return std::get<Ind>(static_cast<Pukpuk *>(this)->data);
+            return std::get<Ind>(data);
         }
     };
 
     template <size_t Ind>
-    struct Get<Value<Ind>> : public Pukpuk
+    struct Get<Value<Ind>>
     {
-        auto operator()()
+        template <typename... DataTypes, typename... ValueTypes>
+        auto operator()(std::tuple<DataTypes...> &data, std::tuple<ValueTypes...> &value)
         {
-            return std::get<Ind>(static_cast<Pukpuk *>(this)->value);
+            return std::get<Ind>(value);
         }
+    };
+
+    template <typename A, typename B>
+    class Getter;
+
+    template <typename... DataTypes, typename... ValueTypes>
+    class Getter<std::tuple<DataTypes...>, std::tuple<ValueTypes...>>
+    {
+    public:
+        Getter(std::tuple<DataTypes...> &dataPtr, std::tuple<ValueTypes...> &valuePtr) : data(dataPtr), value(valuePtr) {};
+
+        template <template <size_t> typename R, size_t Ind>
+        auto operator()(R<Ind>)
+        {
+            return Get<R<Ind>>()(data, value);
+        }
+
+    private:
+        std::tuple<DataTypes...> &data;
+        std::tuple<ValueTypes...> &value;
     };
 }
 
 int main()
 {
-    // GetTest::pukpuk A;
-    // // std::cout << A.get<GetTest::Data, 1>();
-    // GetTest::pukpuk::Get<> pupupu;
-
-    // std::tuple<int, int> a = std::make_tuple(1, 2);
-    // std::tuple<std::string, double> b = std::make_tuple("abc", 2.1);
-
-    // std::cout << std::get<0>(a) << std::get<0>(b);
-
-    GetTest::Pukpuk A;
-    std::cout << GetTest::Get<GetTest::Value<1>>()();
 
     return 0;
 }
