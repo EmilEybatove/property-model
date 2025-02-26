@@ -33,23 +33,14 @@ namespace GetSignatureTest
         using type = GetH<std::tuple<TupleTupes...>, Index>::type;
     };
 
-    struct Penis
-    {
-    };
-
     template <typename... A>
-    struct Type
+    struct Type;
+
+    template <size_t Ind, typename... TupleTupes>
+    struct Type<Data<Ind>, std::tuple<TupleTupes...>>
     {
-        using type = Penis;
+        using type = typename TypeH<Data<Ind>, std::tuple<TupleTupes...>>::type;
     };
-
-    // using Type = TypeH<Data<Index>, std::tuple<TupleTupes...>>::type;
-
-    // template <size_t Ind, typename... TupleTupes>
-    // struct Type<Data<Ind>, std::tuple<TupleTupes...>>
-    // {
-    //     using type = TypeH<Data<Ind>, std::tuple<TupleTupes...>>::type;
-    // };
 
     template <typename... A>
     struct FunctionH;
@@ -57,29 +48,35 @@ namespace GetSignatureTest
     template <typename T, typename... Ts, typename... TupleTupes>
     struct FunctionH<std::tuple<TupleTupes...>, T, Ts...>
     {
-        using type = std::function<Type<T, std::tuple<TupleTupes...>>()>;
-    };
-
-    template <template <size_t> typename R, size_t Ind, class... TupleTupes>
-    struct FunctionH<std::tuple<TupleTupes...>, R<Ind>>
-    {
-        // using type = Type<TupleTupes...>::type (*hui)(void);
-        // using type = std::function<Type<TupleTupes...>::type()>;
-
-        using tmp = Type<TupleTupes...>::type;
-        using type = std::function<tmp()>;
+        using type = std::function<typename Type<T, std::tuple<TupleTupes...>>::type(typename Type<Ts, std::tuple<TupleTupes...>>::type...)>;
     };
 
     // template <size_t> class... Rs, size_t... Inds
 
-    // template <typename... A>
-    // struct Function;
+    template <typename Tuple1, typename... Ts>
+    using Function = typename FunctionH<Tuple1, Ts...>::type;
 
-    // template <typename... Ts, typename... TupleTupes>
-    // struct Function<std::tuple<TupleTupes...>, Ts...>
-    // {
-    //     using f = FunctionH<std::tuple<TupleTupes...>, Ts...>::type;
-    // };
+    using DataTuple = std::tuple<int, double, int>;
+
+    DataTuple cur_data = std::make_tuple(5, 1.65, 56);
+
+    // template <template <size_t> class... Rs, size_t... Inds>
+    template <class... Rs>
+    auto method(Function<DataTuple, Rs...> func)
+    {
+        return func(5, 1.65);
+    }
+
+    int func(int a, double b)
+    {
+        return a * b;
+    }
+
+    void test()
+    {
+
+        std::cout << method<Data<2>, Data<0>, Data<1>>(func);
+    }
 
 }
 
@@ -148,6 +145,6 @@ namespace GetTest
 
 int main()
 {
-
+    GetSignatureTest::test();
     return 0;
 }
