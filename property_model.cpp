@@ -198,9 +198,9 @@ public:
     using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
     using PM = PropertyModel<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
 
-    Builder(DataArgs... dataArgs, ValueArgs... valueArgs, OutputArgs... outputArgs) : pm(std::make_unique<PMImpl>(dataArgs..., valueArgs..., outputArgs...)),
-                                                                                      getter(pm.data, pm.value, pm.output) {};
-    Builder() : pm(std::make_unique<PMImpl>()), getter(pm->data, pm->value, pm->output) {};
+    Builder(DataArgs... dataArgs, ValueArgs... valueArgs, OutputArgs... outputArgs) : pm(std::unique_ptr<PMImpl>(new PMImpl(dataArgs..., valueArgs..., outputArgs...))),
+                                                                                      getter(pm->data, pm->value, pm->output) {};
+    Builder() : pm(std::unique_ptr<PMImpl>(new PMImpl())), getter(pm->data, pm->value, pm->output) {};
 
     template <class R, class T>
     void set(T &&value)
@@ -255,16 +255,16 @@ int main()
 {
     // Builder<std::tuple<int, double>, std::tuple<std::string, char>, std::tuple<size_t, std::string>> builder(2, 4.6, "pupupu", 'n', 123456, "test");
     Builder<std::tuple<int, double>, std::tuple<std::string, char>, std::tuple<size_t, std::string>> builder;
-    // builder.set<Data<0>>(2);
-    // builder.set<Data<1>>(4.6);
-    // builder.set<Value<0>>("pupupu");
-    // builder.set<Value<1>>('n');
-    // builder.set<Output<0>>(123456);
-    // builder.set<Output<1>>("test");
+    builder.set<Data<0>>(2);
+    builder.set<Data<1>>(4.6);
+    builder.set<Value<0>>("pupupu");
+    builder.set<Value<1>>('n');
+    builder.set<Output<0>>(123456);
+    builder.set<Output<1>>("test");
 
-    // builder.add_method<Output<0>, Data<0>, Data<1>>(m1);
-    // builder.new_constraint();
-    // auto pm(std::move(builder.get()));
+    builder.add_method<Output<0>, Data<0>, Data<1>>(m1);
+    builder.new_constraint();
+    auto pm(std::move(builder.get()));
 
     return 0;
 }
