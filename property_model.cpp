@@ -35,7 +35,7 @@ public:
 
 private:
     PropertyModelImpl() = default;
-    PropertyModelImpl(DataArgs... dataArgs, ValueArgs... valueArgs, OutputArgs... outputArgs) : data_(std::make_tuple(dataArgs...)), value_(std::make_tuple(valueArgs...)), output_(std::make_tuple(outputArgs...)), constraints_(std::vector<Constraint>()) {}
+    PropertyModelImpl(DataArgs... dataArgs, ValueArgs... valueArgs, OutputArgs... outputArgs) : data_(std::move(dataArgs...)), value_(std::move(valueArgs...)), output_(std::move(outputArgs...)), constraints_(std::vector<Constraint>()) {}
 
     void setConstraint(Constraint &&c)
     {
