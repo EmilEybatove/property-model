@@ -3,7 +3,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include "getter.h"
+#include "indexing.h"
 #include "binding.h"
 
 struct Method
@@ -32,6 +32,9 @@ public:
     friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
     using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
     friend std::unique_ptr<PMImpl> std::make_unique<PMImpl>();
+    using DataTuple = std::tuple<DataArgs...>;
+    using ValueTuple = std::tuple<ValueArgs...>;
+    using OutputTuple = std::tuple<OutputArgs...>;
 
 private:
     PropertyModelImpl() = default;
@@ -40,6 +43,17 @@ private:
     void setConstraint(Constraint &&c)
     {
         constraints_.push_back(std::move(c));
+    }
+
+    template <typename OutVar, typename... InVars>
+    std::function<void()> build_method(Library::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
+    {
+        auto bind = [this, func]()
+        {
+            Library::Getter<OutVar>::get(data_, value_, output_) = std::invoke(func, Library::Getter<InVars>::get(data_, value_, output_)...);
+        };
+
+        return bind;
     }
 
     std::tuple<DataArgs...> data_;
@@ -81,16 +95,15 @@ public:
     using DataTuple = std::tuple<DataArgs...>;
     using ValueTuple = std::tuple<ValueArgs...>;
     using OutputTuple = std::tuple<OutputArgs...>;
-    using Getter = Getter::Getter<DataTuple, ValueTuple, OutputTuple>;
     using PMImpl = PropertyModelImpl<DataTuple, ValueTuple, OutputTuple>;
     using PM = PropertyModel<DataTuple, ValueTuple, OutputTuple>;
 
-    Builder() : pm_(std::make_unique<PMImpl>()), getter_(pm_->data_, pm_->value_, pm_->output_) {}
+    Builder() : pm_(std::make_unique<PMImpl>()) {}
 
     template <class R, class T>
     void set(T &&value)
     {
-        getter_.template getPtr<R>() = std::move(value);
+        Library::Getter<R>::get(pm_->data_, pm_->value_, pm_->output_) = std::move(value);
     }
 
     void new_constraint(size_t priority)
@@ -109,20 +122,13 @@ public:
     }
 
     template <typename OutVar, typename... InVars>
-    void add_method(Binding::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
+    void add_method(Library::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
     {
-        Getter &current_getter = getter_;
-
-        auto bind = [this, &current_getter, func]()
-        {
-            getter_.template getPtr<OutVar>() = std::invoke(func, getter_.template getPtr<InVars>()...);
-        };
-
-        std::vector<size_t> inputs = {getter_.template getIndex<InVars>()...};
+        auto bind = pm_->template build_method<OutVar, InVars...>(func);
+        std::vector<size_t> inputs = {Library::GetIndex<InVars>::get(pm_->data_, pm_->value_, pm_->output_)...};
         Method m(std::move(bind),
                  inputs,
-                 getter_.template getIndex<OutVar>());
-
+                 Library::GetIndex<OutVar>::get(pm_->data_, pm_->value_, pm_->output_));
         current_constraint_.methods.push_back(m);
     }
 
@@ -141,7 +147,7 @@ private:
     void make_stay_data()
     {
         new_constraint(++max_priority_);
-        auto &val = getter_.template getPtr<Data<Ind>>();
+        auto &val = Library::Getter<Data<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
         add_method<Data<Ind>>([&val]()
                               { return val; });
         if constexpr (Ind + 1 < std::tuple_size<DataTuple>{})
@@ -154,7 +160,7 @@ private:
     void make_stay_value()
     {
         new_constraint(++max_priority_);
-        auto &val = getter_.template getPtr<Value<Ind>>();
+        auto &val = Library::Getter<Value<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
         add_method<Value<Ind>>([&val]()
                                { return val; });
         if constexpr (Ind + 1 < std::tuple_size<ValueTuple>{})
@@ -167,7 +173,8 @@ private:
     void make_stay_output()
     {
         new_constraint(++max_priority_);
-        auto &val = getter_.template getPtr<Output<Ind>>();
+        auto &val = Library::Getter<Output<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
+
         add_method<Output<Ind>>([&val]()
                                 { return val; });
         if constexpr (Ind + 1 < std::tuple_size<OutputTuple>{})
@@ -177,7 +184,6 @@ private:
     }
 
     PM pm_;
-    Getter getter_;
     Constraint current_constraint_;
     size_t max_priority_ = 0;
 };
