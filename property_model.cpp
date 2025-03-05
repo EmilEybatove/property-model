@@ -6,197 +6,202 @@
 #include "indexing.h"
 #include "binding.h"
 
-struct Method
+namespace PropertyModel
 {
-    std::function<void()> func;
-    std::vector<size_t> inputs;
-    size_t output;
-};
-
-struct Constraint
-{
-    std::vector<Method> methods;
-    size_t priority;
-};
-
-template <typename A, typename B, typename C>
-class PropertyModelImpl;
-
-template <typename A, typename B, typename C>
-class Builder;
-
-template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
-class PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
-{
-public:
-    friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
-    using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
-    friend std::unique_ptr<PMImpl> std::make_unique<PMImpl>();
-    using DataTuple = std::tuple<DataArgs...>;
-    using ValueTuple = std::tuple<ValueArgs...>;
-    using OutputTuple = std::tuple<OutputArgs...>;
-
-private:
-    PropertyModelImpl() = default;
-    PropertyModelImpl(DataArgs... dataArgs, ValueArgs... valueArgs, OutputArgs... outputArgs) : data_(std::move(dataArgs...)), value_(std::move(valueArgs...)), output_(std::move(outputArgs...)), constraints_(std::vector<Constraint>()) {}
-
-    void setConstraint(Constraint &&c)
+    struct Method
     {
-        constraints_.push_back(std::move(c));
-    }
+        std::function<void()> func;
+        std::vector<size_t> inputs;
+        size_t output;
+    };
 
-    template <typename OutVar, typename... InVars>
-    std::function<void()> build_method(Library::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
+    struct Constraint
     {
-        auto bind = [this, func]()
+        std::vector<Method> methods;
+        size_t priority;
+    };
+
+    template <typename A, typename B, typename C>
+    class PropertyModelImpl;
+
+    template <typename A, typename B, typename C>
+    class Builder;
+
+    template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
+    class PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
+    {
+    public:
+        friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
+        using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
+        friend std::unique_ptr<PMImpl> std::make_unique<PMImpl>();
+        using DataTuple = std::tuple<DataArgs...>;
+        using ValueTuple = std::tuple<ValueArgs...>;
+        using OutputTuple = std::tuple<OutputArgs...>;
+
+    private:
+        PropertyModelImpl() = default;
+        PropertyModelImpl(DataArgs... dataArgs, ValueArgs... valueArgs, OutputArgs... outputArgs) : data_(std::move(dataArgs...)), value_(std::move(valueArgs...)), output_(std::move(outputArgs...)), constraints_(std::vector<Constraint>()) {}
+
+        void setConstraint(Constraint &&c)
         {
-            Library::Getter<OutVar>::get(data_, value_, output_) = std::invoke(func, Library::Getter<InVars>::get(data_, value_, output_)...);
-        };
-
-        return bind;
-    }
-
-    std::tuple<DataArgs...> data_;
-    std::tuple<ValueArgs...> value_;
-    std::tuple<OutputArgs...> output_;
-    std::vector<Constraint> constraints_;
-};
-
-template <typename A, typename B, typename C>
-class PropertyModel;
-
-template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
-class PropertyModel<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
-{
-public:
-    friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
-    using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
-
-    const PMImpl *operator->() const
-    {
-        return pm_.get();
-    }
-
-    PMImpl *operator->()
-    {
-        return pm_.get();
-    }
-
-private:
-    std::unique_ptr<PMImpl> pm_;
-
-    explicit PropertyModel(std::unique_ptr<PMImpl> pm) : pm_(std::move(pm)) {}
-};
-
-template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
-class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
-{
-public:
-    using DataTuple = std::tuple<DataArgs...>;
-    using ValueTuple = std::tuple<ValueArgs...>;
-    using OutputTuple = std::tuple<OutputArgs...>;
-    using PMImpl = PropertyModelImpl<DataTuple, ValueTuple, OutputTuple>;
-    using PM = PropertyModel<DataTuple, ValueTuple, OutputTuple>;
-
-    Builder() : pm_(std::make_unique<PMImpl>()) {}
-
-    template <class R, class T>
-    void set(T &&value)
-    {
-        Library::Getter<R>::get(pm_->data_, pm_->value_, pm_->output_) = std::move(value);
-    }
-
-    void new_constraint(size_t priority)
-    {
-        if (!current_constraint_.methods.empty())
-        {
-            pm_->setConstraint(std::move(current_constraint_));
+            constraints_.push_back(std::move(c));
         }
-        current_constraint_.methods.clear();
-        current_constraint_.methods.shrink_to_fit();
-        current_constraint_.priority = priority;
-        if (priority > max_priority_)
+
+        template <typename OutVar, typename... InVars>
+        std::function<void()> build_method(Library::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
         {
-            max_priority_ = priority;
+            auto bind = [this, func]()
+            {
+                Library::Getter<OutVar>::get(data_, value_, output_) = std::invoke(func, Library::Getter<InVars>::get(data_, value_, output_)...);
+            };
+
+            return bind;
         }
-    }
 
-    template <typename OutVar, typename... InVars>
-    void add_method(Library::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
+        std::tuple<DataArgs...> data_;
+        std::tuple<ValueArgs...> value_;
+        std::tuple<OutputArgs...> output_;
+        std::vector<Constraint> constraints_;
+    };
+
+    template <typename A, typename B, typename C>
+    class PropertyModel;
+
+    template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
+    class PropertyModel<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
     {
-        auto bind = pm_->template build_method<OutVar, InVars...>(func);
-        std::vector<size_t> inputs = {Library::GetIndex<InVars>::get(pm_->data_, pm_->value_, pm_->output_)...};
-        Method m(std::move(bind),
-                 inputs,
-                 Library::GetIndex<OutVar>::get(pm_->data_, pm_->value_, pm_->output_));
-        current_constraint_.methods.push_back(m);
-    }
+    public:
+        friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
+        using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
 
-    PM get()
-    {
-        make_stay_data<0>();
-        make_stay_value<0>();
-        make_stay_output<0>();
-        new_constraint(0);
-
-        return std::move(pm_);
-    }
-
-private:
-    template <size_t Ind>
-    void make_stay_data()
-    {
-        new_constraint(++max_priority_);
-        auto &val = Library::Getter<Data<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
-        add_method<Data<Ind>>([&val]()
-                              { return val; });
-        if constexpr (Ind + 1 < std::tuple_size<DataTuple>{})
+        const PMImpl *operator->() const
         {
-            make_stay_data<Ind + 1>();
+            return pm_.get();
         }
-    }
 
-    template <size_t Ind>
-    void make_stay_value()
-    {
-        new_constraint(++max_priority_);
-        auto &val = Library::Getter<Value<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
-        add_method<Value<Ind>>([&val]()
-                               { return val; });
-        if constexpr (Ind + 1 < std::tuple_size<ValueTuple>{})
+        PMImpl *operator->()
         {
-            make_stay_data<Ind + 1>();
+            return pm_.get();
         }
-    }
 
-    template <size_t Ind>
-    void make_stay_output()
+    private:
+        std::unique_ptr<PMImpl> pm_;
+
+        explicit PropertyModel(std::unique_ptr<PMImpl> pm) : pm_(std::move(pm)) {}
+    };
+
+    template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
+    class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
     {
-        new_constraint(++max_priority_);
-        auto &val = Library::Getter<Output<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
+    public:
+        using DataTuple = std::tuple<DataArgs...>;
+        using ValueTuple = std::tuple<ValueArgs...>;
+        using OutputTuple = std::tuple<OutputArgs...>;
+        using PMImpl = PropertyModelImpl<DataTuple, ValueTuple, OutputTuple>;
+        using PM = PropertyModel<DataTuple, ValueTuple, OutputTuple>;
 
-        add_method<Output<Ind>>([&val]()
-                                { return val; });
-        if constexpr (Ind + 1 < std::tuple_size<OutputTuple>{})
+        Builder() : pm_(std::make_unique<PMImpl>()) {}
+
+        template <class R, class T>
+        void set(T &&value)
         {
-            make_stay_data<Ind + 1>();
+            Library::Getter<R>::get(pm_->data_, pm_->value_, pm_->output_) = std::move(value);
         }
+
+        void new_constraint(size_t priority)
+        {
+            if (!current_constraint_.methods.empty())
+            {
+                pm_->setConstraint(std::move(current_constraint_));
+            }
+            current_constraint_.methods.clear();
+            current_constraint_.methods.shrink_to_fit();
+            current_constraint_.priority = priority;
+            if (priority > max_priority_)
+            {
+                max_priority_ = priority;
+            }
+        }
+
+        template <typename OutVar, typename... InVars>
+        void add_method(Library::Function<DataTuple, ValueTuple, OutputTuple, OutVar, InVars...> func)
+        {
+            auto bind = pm_->template build_method<OutVar, InVars...>(func);
+            std::vector<size_t> inputs = {Library::GetIndex<InVars>::get(pm_->data_, pm_->value_, pm_->output_)...};
+            Method m(std::move(bind),
+                     inputs,
+                     Library::GetIndex<OutVar>::get(pm_->data_, pm_->value_, pm_->output_));
+            current_constraint_.methods.push_back(m);
+        }
+
+        PM get()
+        {
+            make_stay_data<0>();
+            make_stay_value<0>();
+            make_stay_output<0>();
+            new_constraint(0);
+
+            return std::move(pm_);
+        }
+
+    private:
+        template <size_t Ind>
+        void make_stay_data()
+        {
+            new_constraint(++max_priority_);
+            auto &val = Library::Getter<Data<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
+            add_method<Data<Ind>>([&val]()
+                                  { return val; });
+            if constexpr (Ind + 1 < std::tuple_size<DataTuple>{})
+            {
+                make_stay_data<Ind + 1>();
+            }
+        }
+
+        template <size_t Ind>
+        void make_stay_value()
+        {
+            new_constraint(++max_priority_);
+            auto &val = Library::Getter<Value<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
+            add_method<Value<Ind>>([&val]()
+                                   { return val; });
+            if constexpr (Ind + 1 < std::tuple_size<ValueTuple>{})
+            {
+                make_stay_data<Ind + 1>();
+            }
+        }
+
+        template <size_t Ind>
+        void make_stay_output()
+        {
+            new_constraint(++max_priority_);
+            auto &val = Library::Getter<Output<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
+
+            add_method<Output<Ind>>([&val]()
+                                    { return val; });
+            if constexpr (Ind + 1 < std::tuple_size<OutputTuple>{})
+            {
+                make_stay_data<Ind + 1>();
+            }
+        }
+
+        PM pm_;
+        Constraint current_constraint_;
+        size_t max_priority_ = 0;
+    };
+
+    size_t m1(int a, double b)
+    {
+        return a * b;
     }
 
-    PM pm_;
-    Constraint current_constraint_;
-    size_t max_priority_ = 0;
-};
-
-size_t m1(int a, double b)
-{
-    return a * b;
+    char m2(std::string b)
+    {
+        return b[1];
+    }
 }
 
-char m2(std::string b)
-{
-    return b[1];
-}
+using namespace PropertyModel;
 
 int main()
 {
