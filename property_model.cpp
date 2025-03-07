@@ -3,6 +3,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <utility>
 #include "indexing.h"
 #include "binding.h"
 
@@ -115,7 +116,6 @@ namespace PropertyModel
                 pm_->setConstraint(std::move(current_constraint_));
             }
             current_constraint_.methods.clear();
-            current_constraint_.methods.shrink_to_fit();
             current_constraint_.priority = priority;
             if (priority > max_priority_)
             {
@@ -136,69 +136,45 @@ namespace PropertyModel
 
         PM get()
         {
-            make_stay_data<0>();
-            make_stay_value<0>();
-            make_stay_output<0>();
+            make_all_stays(pm_->data_);
+            make_all_stays(pm_->value_);
+            make_all_stays(pm_->output_);
             new_constraint(0);
 
             return std::move(pm_);
         }
 
     private:
-        template <size_t Ind>
-        void make_stay_data()
+        template <size_t Ind, typename... TupleArgs>
+        void make_stay(std::tuple<TupleArgs...> &variables)
         {
             new_constraint(++max_priority_);
-            auto &val = Library::Getter<Data<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
+            auto &val = std::get<Ind>(variables);
             add_method<Data<Ind>>([&val]()
                                   { return val; });
-            if constexpr (Ind + 1 < std::tuple_size<DataTuple>{})
-            {
-                make_stay_data<Ind + 1>();
-            }
         }
 
-        template <size_t Ind>
-        void make_stay_value()
+        template <typename... TupleArgs, size_t... Inds>
+        void make_stays_from_seq(std::tuple<TupleArgs...> &variables, std::integer_sequence<size_t, Inds...>)
         {
-            new_constraint(++max_priority_);
-            auto &val = Library::Getter<Value<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
-            add_method<Value<Ind>>([&val]()
-                                   { return val; });
-            if constexpr (Ind + 1 < std::tuple_size<ValueTuple>{})
-            {
-                make_stay_data<Ind + 1>();
-            }
+            (make_stay<Inds>(variables), ...);
         }
 
-        template <size_t Ind>
-        void make_stay_output()
+        template <typename... TupleArgs>
+        void make_all_stays(std::tuple<TupleArgs...> &variables)
         {
-            new_constraint(++max_priority_);
-            auto &val = Library::Getter<Output<Ind>>::get(pm_->data_, pm_->value_, pm_->output_);
-
-            add_method<Output<Ind>>([&val]()
-                                    { return val; });
-            if constexpr (Ind + 1 < std::tuple_size<OutputTuple>{})
-            {
-                make_stay_data<Ind + 1>();
-            }
+            make_stays_from_seq(variables, std::make_index_sequence<std::tuple_size<std::tuple<TupleArgs...>>{}>{});
         }
 
         PM pm_;
         Constraint current_constraint_;
         size_t max_priority_ = 0;
     };
+}
 
-    size_t m1(int a, double b)
-    {
-        return a * b;
-    }
-
-    char m2(std::string b)
-    {
-        return b[1];
-    }
+size_t m1(int a, double b)
+{
+    return a * b;
 }
 
 using namespace PropertyModel;
