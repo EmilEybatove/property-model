@@ -9,6 +9,15 @@
 
 namespace PropertyModel
 {
+    template <typename... Args>
+    using DataTypes = std::tuple<Args...>;
+
+    template <typename... Args>
+    using ValueTypes = std::tuple<Args...>;
+
+    template <typename... Args>
+    using OutputTypes = std::tuple<Args...>;
+
     struct Method
     {
         std::function<void()> func;
@@ -29,15 +38,15 @@ namespace PropertyModel
     class Builder;
 
     template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
-    class PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
+    class PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>
     {
     public:
-        friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
-        using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
+        friend class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>;
+        using PMImpl = PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>;
         friend std::unique_ptr<PMImpl> std::make_unique<PMImpl>();
-        using DataTuple = std::tuple<DataArgs...>;
-        using ValueTuple = std::tuple<ValueArgs...>;
-        using OutputTuple = std::tuple<OutputArgs...>;
+        using DataTuple = DataTypes<DataArgs...>;
+        using ValueTuple = ValueTypes<ValueArgs...>;
+        using OutputTuple = OutputTypes<OutputArgs...>;
 
     private:
         PropertyModelImpl() = default;
@@ -59,9 +68,9 @@ namespace PropertyModel
             return bind;
         }
 
-        std::tuple<DataArgs...> data_;
-        std::tuple<ValueArgs...> value_;
-        std::tuple<OutputArgs...> output_;
+        DataTuple data_;
+        ValueTuple value_;
+        OutputTuple output_;
         std::vector<Constraint> constraints_;
     };
 
@@ -69,11 +78,11 @@ namespace PropertyModel
     class PropertyModel;
 
     template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
-    class PropertyModel<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
+    class PropertyModel<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>
     {
     public:
-        friend class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
-        using PMImpl = PropertyModelImpl<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>;
+        friend class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>;
+        using PMImpl = PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>;
 
         const PMImpl *operator->() const
         {
@@ -92,12 +101,12 @@ namespace PropertyModel
     };
 
     template <typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
-    class Builder<std::tuple<DataArgs...>, std::tuple<ValueArgs...>, std::tuple<OutputArgs...>>
+    class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>, OutputTypes<OutputArgs...>>
     {
     public:
-        using DataTuple = std::tuple<DataArgs...>;
-        using ValueTuple = std::tuple<ValueArgs...>;
-        using OutputTuple = std::tuple<OutputArgs...>;
+        using DataTuple = DataTypes<DataArgs...>;
+        using ValueTuple = ValueTypes<ValueArgs...>;
+        using OutputTuple = OutputTypes<OutputArgs...>;
         using PMImpl = PropertyModelImpl<DataTuple, ValueTuple, OutputTuple>;
         using PM = PropertyModel<DataTuple, ValueTuple, OutputTuple>;
 
@@ -181,7 +190,7 @@ using namespace PropertyModel;
 
 int main()
 {
-    Builder<std::tuple<int, double>, std::tuple<int, double>, std::tuple<int, double>> builder;
+    Builder<DataTypes<int, double>, ValueTypes<int, double>, OutputTypes<int, double>> builder;
     builder.set<Data<0>>(2);
     builder.set<Data<1>>(4.6);
     builder.set<Value<0>>(4);
