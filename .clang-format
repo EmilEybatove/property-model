@@ -10,3 +10,6 @@ PointerAlignment: Left
 SpaceAfterTemplateKeyword: false
 SpacesInContainerLiterals: false
 InsertNewlineAtEOF: true
+UseTab: Always
+IndentWidth: 4
+TabWidth: 4
