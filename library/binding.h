@@ -1,4 +1,4 @@
-#include "../utils/utils.h"
+#include "utils.h"
 #include <cstdio>
 #include <functional>
 #include <tuple>
@@ -25,17 +25,17 @@ template<class Index, typename... TupleTupes>
 struct TypeH;
 
 template<size_t Index, typename Tuple1, typename Tuple2, typename Tuple3>
-struct TypeH<utils::Data<Index>, Tuple1, Tuple2, Tuple3> {
+struct TypeH<Data<Index>, Tuple1, Tuple2, Tuple3> {
 	using type = Get<Tuple1, Index>;
 };
 
 template<size_t Index, typename Tuple1, typename Tuple2, typename Tuple3>
-struct TypeH<utils::Value<Index>, Tuple1, Tuple2, Tuple3> {
+struct TypeH<Value<Index>, Tuple1, Tuple2, Tuple3> {
 	using type = Get<Tuple2, Index>;
 };
 
 template<size_t Index, typename Tuple1, typename Tuple2, typename Tuple3>
-struct TypeH<utils::Output<Index>, Tuple1, Tuple2, Tuple3> {
+struct TypeH<Output<Index>, Tuple1, Tuple2, Tuple3> {
 	using type = Get<Tuple3, Index>;
 };
 
@@ -62,7 +62,7 @@ template<class A>
 struct Getter;
 
 template<size_t Ind>
-struct Getter<utils::Data<Ind>> {
+struct Getter<Data<Ind>> {
 	template<typename... DataTypes, typename... ValueTypes,
 			 typename... OutputTypes>
 	static auto& get(std::tuple<DataTypes...>& data,
@@ -73,7 +73,7 @@ struct Getter<utils::Data<Ind>> {
 };
 
 template<size_t Ind>
-struct Getter<utils::Value<Ind>> {
+struct Getter<Value<Ind>> {
 	template<typename... DataTypes, typename... ValueTypes,
 			 typename... OutputTypes>
 	static auto& get(std::tuple<DataTypes...>& data,
@@ -84,7 +84,7 @@ struct Getter<utils::Value<Ind>> {
 };
 
 template<size_t Ind>
-struct Getter<utils::Output<Ind>> {
+struct Getter<Output<Ind>> {
 	template<typename... DataTypes, typename... ValueTypes,
 			 typename... OutputTypes>
 	static auto& get(std::tuple<DataTypes...>& data,

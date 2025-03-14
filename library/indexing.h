@@ -1,4 +1,4 @@
-#include "../utils/utils.h"
+#include "utils.h"
 #include <cstdio>
 #include <functional>
 #include <tuple>
@@ -9,7 +9,7 @@ template<class A>
 struct GetIndex;
 
 template<size_t Ind>
-struct GetIndex<utils::Data<Ind>> {
+struct GetIndex<Data<Ind>> {
 	template<typename... DataTypes, typename... ValueTypes,
 			 typename... OutputTypes>
 	static size_t get(std::tuple<DataTypes...>& data,
@@ -20,7 +20,7 @@ struct GetIndex<utils::Data<Ind>> {
 };
 
 template<size_t Ind>
-struct GetIndex<utils::Value<Ind>> {
+struct GetIndex<Value<Ind>> {
 	template<typename... DataTypes, typename... ValueTypes,
 			 typename... OutputTypes>
 	static size_t get(std::tuple<DataTypes...>& data,
@@ -31,7 +31,7 @@ struct GetIndex<utils::Value<Ind>> {
 };
 
 template<size_t Ind>
-struct GetIndex<utils::Output<Ind>> {
+struct GetIndex<Output<Ind>> {
 	template<typename... DataTypes, typename... ValueTypes,
 			 typename... OutputTypes>
 	static size_t get(std::tuple<DataTypes...>& data,

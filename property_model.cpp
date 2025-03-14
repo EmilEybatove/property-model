@@ -168,12 +168,12 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 
 		switch (mode) {
 		case 0:
-			add_method<utils::Data<Ind>>([&val]() { return val; });
+			add_method<Library::Data<Ind>>([&val]() { return val; });
 			break;
 		case 1:
-			add_method<utils::Value<Ind>>([&val]() { return val; });
+			add_method<Library::Value<Ind>>([&val]() { return val; });
 		case 2:
-			add_method<utils::Output<Ind>>([&val]() { return val; });
+			add_method<Library::Output<Ind>>([&val]() { return val; });
 		default:
 			break;
 		}
@@ -208,15 +208,16 @@ int main() {
 	Builder<DataTypes<int, double>, ValueTypes<int, double>,
 			OutputTypes<int, double>>
 		builder;
-	builder.set<utils::Data<0>>(2);
-	builder.set<utils::Data<1>>(4.6);
-	builder.set<utils::Value<0>>(4);
-	builder.set<utils::Value<1>>(4.65);
-	builder.set<utils::Output<0>>(123456);
-	builder.set<utils::Output<1>>(1);
+	builder.set<Library::Data<0>>(2);
+	builder.set<Library::Data<1>>(4.6);
+	builder.set<Library::Value<0>>(4);
+	builder.set<Library::Value<1>>(4.65);
+	builder.set<Library::Output<0>>(123456);
+	builder.set<Library::Output<1>>(1);
 
 	builder.new_constraint(1);
-	builder.add_method<utils::Output<0>, utils::Data<0>, utils::Data<1>>(m1);
+	builder.add_method<Library::Output<0>, Library::Data<0>, Library::Data<1>>(
+		m1);
 
 	auto pm = builder.get();
 

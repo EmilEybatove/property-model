@@ -2,7 +2,7 @@
 
 #pragma once
 
-namespace utils {
+namespace Library {
 
 template<size_t Index>
 struct Data;
@@ -12,4 +12,4 @@ struct Value;
 
 template<size_t Index>
 struct Output;
-} // namespace utils
+} // namespace Library

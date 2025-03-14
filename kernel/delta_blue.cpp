@@ -1,56 +1,94 @@
 #include <cstdio>
-#include <vector>
 #include <functional>
+#include <vector>
+// #include <variant>
 
-struct Variable
-{
-    size_t force;
-    size_t determined_by;
+struct Variable {
+	size_t force;
+	size_t determined_by;
 };
 
-struct Method
-{
-    std::function<void()> func;
-    std::vector<size_t> inputs;
-    size_t output;
+struct Method {
+	std::function<void()> func;
+	std::vector<size_t> inputs;
+	size_t output;
 };
 
-struct Constraint
-{
-    std::vector<Method> methods;
-    size_t priority;
-    bool IsStay;
+struct Constraint {
+	std::vector<Method> methods;
+	size_t priority;
+	bool IsStay;
+	size_t position;
 };
 
-struct SolutionGraph
-{
-    std::vector<Variable> variables;
-    std::vector<std::reference_wrapper<Constraint>> constraints;
-    std::vector<size_t> StayPositions;
-    std::vector<int> choosenMethods;
+class ConstraintGraph {
+	friend DeltaBlue;
+
+  private:
+	void new_constraint(Constraint constraint) {};
+
+	std::vector<Variable> variables;
 };
 
-class DeltaBlue
-{
-private:
-    static SolutionGraph init(std::vector<Constraint> &all_constraints)
-    {
-        std::vector<Variable> variables;
-        std::vector<std::reference_wrapper<Constraint>> constraints;
-        std::vector<size_t> StayPositions;
-        std::vector<int> choosenMethods;
+class SolutionGraph {
+	friend DeltaBlue;
 
-        for (size_t i = 0; i < all_constraints.size(); ++i)
-        {
-            if (all_constraints[i].IsStay)
-            {
-                variables.push_back({all_constraints[i].priority, i});
-                constraints.push_back(all_constraints[i]);
-                StayPositions.push_back(i);
-                choosenMethods.push_back(0);
-            }
-        }
+  private:
+	void init_stay(Constraint constraint) {};
+};
 
-        return {variables, constraints, StayPositions, choosenMethods};
-    }
+class DeltaBlue {
+  public:
+	static void add_constraint(Constraint constraint, ConstraintGraph& GC,
+							   SolutionGraph& GS) {
+		GC.new_constraint(constraint);
+
+		for (Method& method : constraint.methods) {
+		}
+	}
+
+	static void build_solution(std::vector<Constraint>& all_constraints,
+							   ConstraintGraph& GC, SolutionGraph& GS) {
+		init(all_constraints, GC, GS);
+		for (Constraint& constraint : all_constraints) {
+			add_constraint(constraint, GC, GS);
+		}
+	}
+
+  private:
+	static void init(std::vector<Constraint>& all_constraints,
+					 ConstraintGraph& GC, SolutionGraph& GS) {
+		for (Constraint& constraint : all_constraints) {
+			if (constraint.IsStay) {
+				GC.new_constraint(constraint);
+				GS.init_stay(constraint);
+			}
+		}
+	}
+
+	static bool pacanski_razvorot(Constraint& constraint, ConstraintGraph& GC,
+								  SolutionGraph& GS) {
+		size_t force = 0;
+		Variable& variable = GC.variables[0];
+		for (Method& method : constraint.methods) {
+			if (GC.variables[method.output].force > force) {
+				variable = GC.variables[method.output];
+				force = variable.force;
+			}
+		}
+		if (force == 0) {
+			exit(1); // это ужасно
+		}
+
+		if (force <= constraint.priority) {
+			return false;
+		}
+
+		while (constraint.priority != force) {
+		}
+
+		for (Method& method : constraint.methods) {
+			if (GC.variables[method.output].force == method.)
+		}
+	}
 };
