@@ -10,8 +10,9 @@
 
 namespace PropertyModel {
 using Method = Kernel::Method;
-using Contraint = Kernel::Constraint;
+using Constraint = Kernel::Constraint;
 using ConstraintGraph = Kernel::ConstraintGraph;
+using DeltaBlue = Kernel::DeltaBlue;
 template<typename... Args>
 using DataTypes = std::tuple<Args...>;
 
@@ -46,12 +47,11 @@ class PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 	PropertyModelImpl(DataArgs... dataArgs, ValueArgs... valueArgs,
 					  OutputArgs... outputArgs)
 		: data_(std::move(dataArgs...)), value_(std::move(valueArgs...)),
-		  output_(std::move(outputArgs...)),
-		  constraints_(std::vector<Constraint>()) {
+		  output_(std::move(outputArgs...)) {
 	}
 
-	void setConstraint(Constraint&& c) {
-		constraints_.push_back(std::move(c));
+	void setConstraint(std::unique_ptr<Constraint>& c) {
+		GC_.new_constraint(c);
 	}
 
 	template<typename OutVar, typename... InVars>
@@ -69,7 +69,7 @@ class PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 	DataTuple data_;
 	ValueTuple value_;
 	OutputTuple output_;
-	std::vector<Constraint> constraints_;
+	ConstraintGraph GC_;
 };
 
 template<typename A, typename B, typename C>
@@ -110,7 +110,9 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 	using PMImpl = PropertyModelImpl<DataTuple, ValueTuple, OutputTuple>;
 	using PM = PropertyModel<DataTuple, ValueTuple, OutputTuple>;
 
-	Builder() : pm_(std::make_unique<PMImpl>()) {
+	Builder()
+		: pm_(std::make_unique<PMImpl>()),
+		  current_constraint_(std::make_unique<Constraint>()) {
 	}
 
 	template<class R, class T>
@@ -119,12 +121,16 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 			std::move(value);
 	}
 
-	void new_constraint(size_t priority) {
-		if (!current_constraint_.methods.empty()) {
-			pm_->setConstraint(std::move(current_constraint_));
+	void new_constraint(size_t priority, bool IsStay = false) {
+		if (!current_constraint_->methods.empty()) {
+			pm_->setConstraint(current_constraint_);
 		}
-		current_constraint_.methods.clear();
-		current_constraint_.priority = priority;
+		current_constraint_ = std::make_unique<Constraint>();
+		current_constraint_->priority = priority;
+		current_constraint_->IsStay = IsStay;
+		if (!current_constraint_->IsStay) {
+			current_constraint_->enabled = true;
+		}
 		if (priority > max_priority_) {
 			max_priority_ = priority;
 		}
@@ -141,7 +147,7 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 		 ...);
 		m.output = Library::GetIndex<OutVar>::get(pm_->data_, pm_->value_,
 												  pm_->output_);
-		current_constraint_.methods.push_back(m);
+		current_constraint_->methods.push_back(m);
 	}
 
 	PM get() {
@@ -150,13 +156,15 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 		make_all_stays<2>(pm_->output_);
 		new_constraint(0);
 
+		DeltaBlue::build_solution(pm_->GC_);
+
 		return std::move(pm_);
 	}
 
   private:
 	template<int mode, size_t Ind, typename... TupleArgs>
 	void make_stay(std::tuple<TupleArgs...>& variables) {
-		new_constraint(++max_priority_);
+		new_constraint(++max_priority_, true);
 		auto& val = std::get<Ind>(variables);
 
 		switch (mode) {
@@ -186,7 +194,7 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 	}
 
 	PM pm_;
-	Constraint current_constraint_;
+	std::unique_ptr<Constraint> current_constraint_;
 	size_t max_priority_ = 0;
 };
 } // namespace PropertyModel
