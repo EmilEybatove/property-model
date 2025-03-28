@@ -1,3 +1,4 @@
+#include "kernel/delta_blue.cpp"
 #include "library/binding.h"
 #include "library/indexing.h"
 #include <functional>
@@ -8,6 +9,9 @@
 #include <vector>
 
 namespace PropertyModel {
+using Method = Kernel::Method;
+using Contraint = Kernel::Constraint;
+using ConstraintGraph = Kernel::ConstraintGraph;
 template<typename... Args>
 using DataTypes = std::tuple<Args...>;
 
@@ -16,17 +20,6 @@ using ValueTypes = std::tuple<Args...>;
 
 template<typename... Args>
 using OutputTypes = std::tuple<Args...>;
-
-struct Method {
-	std::function<void()> func;
-	std::vector<size_t> inputs;
-	size_t output;
-};
-
-struct Constraint {
-	std::vector<Method> methods;
-	size_t priority;
-};
 
 template<typename A, typename B, typename C>
 class PropertyModelImpl;
