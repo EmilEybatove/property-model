@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdio>
 #include <functional>
 #include <memory>
@@ -78,6 +79,37 @@ class DeltaBlue {
 		}
 	}
 
+	static void changed_value(size_t variable, ConstraintGraph& GC) {
+		exec_plan(GC);
+		for (std::unique_ptr<Constraint>& constraint : GC.constraints) {
+			if (constraint->IsStay &&
+				constraint->methods[0].output == variable) {
+				up_stay(constraint, GC);
+				break;
+			}
+		}
+	}
+
+	static void enable_constraint(const std::unique_ptr<Constraint>& constraint,
+								  ConstraintGraph& GC) {
+		if (!constraint->enabled) {
+			for (size_t input : constraint->choosen->inputs) {
+				GC.get_variable(input).output.emplace(constraint->position);
+			}
+			constraint->enabled = true;
+			constraint->choosen = nullptr;
+		}
+	}
+
+  private:
+	static void exec_plan(ConstraintGraph& GC) {
+		std::vector<size_t> order;
+		topsort_constraint(GC, order);
+		for (size_t constraint_position : order) {
+			GC.get_constraint_const(constraint_position)->choosen->func();
+		}
+	}
+
 	static void up_stay(std::unique_ptr<Constraint>& constraint,
 						ConstraintGraph& GC) {
 		size_t priority = constraint->priority;
@@ -94,18 +126,6 @@ class DeltaBlue {
 		recalc_force(GC);
 	}
 
-	static void enable_constraint(const std::unique_ptr<Constraint>& constraint,
-								  ConstraintGraph& GC) {
-		if (!constraint->enabled) {
-			for (size_t input : constraint->choosen->inputs) {
-				GC.get_variable(input).output.emplace(constraint->position);
-			}
-			constraint->enabled = true;
-			constraint->choosen = nullptr;
-		}
-	}
-
-  private:
 	static void add_constraint(std::unique_ptr<Constraint>& constraint,
 							   ConstraintGraph& GC) {
 		constraint->enabled = false;
@@ -115,8 +135,7 @@ class DeltaBlue {
 			if (cycle_checker(constraint, GC, colors)) {
 				exit(1);
 			}
-			add_propogate(GC.get_variable(constraint->choosen->output), GC,
-						  nullptr);
+			add_propogate(GC.get_variable(constraint->choosen->output), GC);
 		}
 	}
 
@@ -189,16 +208,20 @@ class DeltaBlue {
 		return false;
 	}
 
-	static void add_propogate(Variable& variable, ConstraintGraph& GC,
-							  std::vector<bool>* visited) {
-		if (visited != nullptr) {
-			if ((*visited)[variable.position]) {
-				return;
-			}
-			(*visited)[variable.position] = true;
-		}
+	static void add_propogate(Variable& variable, ConstraintGraph& GC) {
 		const std::unique_ptr<Constraint>& constraint =
 			GC.get_constraint_const(variable.determined_by);
+		add_propogate_step(variable, constraint, GC);
+
+		for (size_t constraint_index : variable.output) {
+			add_propogate(GC.get_variable(constraint->choosen->output), GC);
+		}
+	}
+
+	static void
+	add_propogate_step(Variable& variable,
+					   const std::unique_ptr<Constraint>& constraint,
+					   ConstraintGraph& GC) {
 		size_t force = constraint->priority;
 		for (const Method& method : constraint->methods) {
 			if (&method != constraint->choosen) {
@@ -207,19 +230,45 @@ class DeltaBlue {
 			}
 		}
 		variable.force = force;
-
-		for (size_t constraint_index : variable.output) {
-			add_propogate(GC.get_variable(constraint->choosen->output), GC,
-						  visited);
-		}
 	}
 
 	static void recalc_force(ConstraintGraph& GC) {
-		std::vector<bool> visited(GC.variables.size(), false);
-		for (size_t i = 0; i < visited.size(); ++i) {
-			if (!visited[i]) {
-				add_propogate(GC.get_variable(i), GC, &visited);
-			}
+		std::vector<size_t> order;
+		topsort_constraint(GC, order);
+		for (size_t constraint_position : order) {
+			const std::unique_ptr<Constraint>& constraint =
+				GC.get_constraint_const(constraint_position);
+			Variable& variable = GC.get_variable(constraint->choosen->output);
+			add_propogate_step(variable, constraint, GC);
+		}
+	}
+
+	static void topsort_constraint(ConstraintGraph& GC,
+								   std::vector<size_t>& order) {
+		std::vector<bool> visited(GC.constraints.size());
+		order.clear();
+
+		for (const std::unique_ptr<Constraint>& constraint : GC.constraints) {
+			topsort_constraint(constraint, GC, order, visited);
+		}
+
+		std::reverse(order.begin(), order.end());
+	}
+
+	static void
+	topsort_constraint(const std::unique_ptr<Constraint>& constraint,
+					   ConstraintGraph& GC, std::vector<size_t>& order,
+					   std::vector<bool>& visited) {
+		if (visited[constraint->position]) {
+			return;
+		}
+		order.push_back(constraint->position);
+		visited[constraint->position] = true;
+		for (size_t variable_position : constraint->choosen->inputs) {
+			topsort_constraint(
+				GC.get_constraint_const(
+					GC.get_variable_const(variable_position).determined_by),
+				GC, order, visited);
 		}
 	}
 };

@@ -42,6 +42,14 @@ class PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 	using ValueTuple = ValueTypes<ValueArgs...>;
 	using OutputTuple = OutputTypes<OutputArgs...>;
 
+	template<typename R>
+	void update_variable(
+		Library::Type<R, DataTuple, ValueTuple, OutputTuple>&& value) {
+		Library::Getter<R>::get(data_, value_, output_) = std::move(value);
+		Kernel::DeltaBlue::changed_value(
+			Library::GetIndex<R>::get(data_, value_, output_), GC_);
+	}
+
   private:
 	PropertyModelImpl() = default;
 	PropertyModelImpl(DataArgs... dataArgs, ValueArgs... valueArgs,

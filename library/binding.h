@@ -38,9 +38,12 @@ template<size_t Index, typename Tuple1, typename Tuple2, typename Tuple3>
 struct TypeH<Output<Index>, Tuple1, Tuple2, Tuple3> {
 	using type = Get<Tuple3, Index>;
 };
+} // namespace Details
 
 template<typename R, typename Tuple1, typename Tuple2, typename Tuple3>
-using Type = typename TypeH<R, Tuple1, Tuple2, Tuple3>::type;
+using Type = typename Details::TypeH<R, Tuple1, Tuple2, Tuple3>::type;
+
+namespace Details {
 
 template<typename... A>
 struct FunctionH;
