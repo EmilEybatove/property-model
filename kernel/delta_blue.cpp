@@ -9,6 +9,7 @@ struct Variable {
 	size_t force;
 	size_t determined_by;
 	std::unordered_set<size_t> output;
+	size_t position;
 };
 
 struct Method {
@@ -28,7 +29,7 @@ struct Constraint {
 
 class ConstraintGraph {
   public:
-	const Variable& get_variable_const(size_t index) {
+	const Variable& get_variable_const(size_t index) const {
 		return variables[index];
 	}
 
@@ -36,7 +37,8 @@ class ConstraintGraph {
 		return variables[index];
 	}
 
-	const std::unique_ptr<Constraint>& get_constraint_const(size_t index) {
+	const std::unique_ptr<Constraint>&
+	get_constraint_const(size_t index) const {
 		return constraints[index];
 	}
 
@@ -50,6 +52,7 @@ class ConstraintGraph {
 		if (constraint->IsStay) {
 			while (constraint->methods[0].output >= variables.size()) {
 				variables.push_back(Variable());
+				variables[variables.size() - 1].position = variables.size() - 1;
 			}
 			variables[constraint->methods[0].output].determined_by =
 				constraint->position;
@@ -75,31 +78,31 @@ class DeltaBlue {
 		}
 	}
 
-	static void up_stay(size_t constraint_position, ConstraintGraph& GC) {
-		size_t priority = GC.constraints[constraint_position]->priority;
+	static void up_stay(std::unique_ptr<Constraint>& constraint,
+						ConstraintGraph& GC) {
+		size_t priority = constraint->priority;
 		for (std::unique_ptr<Constraint>& current_constraint : GC.constraints) {
 			if (current_constraint->IsStay) {
 				priority = std::min(current_constraint->priority, priority);
 				++current_constraint->priority;
 			}
 		}
-		GC.get_constraint(constraint_position)->priority = priority;
-		if (GC.get_constraint(constraint_position)->choosen == nullptr) {
-			add_constraint(GC.get_constraint(constraint_position), GC);
+		constraint->priority = priority;
+		if (constraint->choosen == nullptr) {
+			add_constraint(constraint, GC);
 		}
 		recalc_force(GC);
 	}
 
-	static void enable_constraint(size_t constraint_position,
+	static void enable_constraint(const std::unique_ptr<Constraint>& constraint,
 								  ConstraintGraph& GC) {
-		if (!GC.constraints[constraint_position]->enabled) {
-			for (size_t input : GC.get_constraint_const(constraint_position)
-									->choosen->inputs) {
-				GC.variables[input].output.emplace(constraint_position);
+		if (!constraint->enabled) {
+			for (size_t input : constraint->choosen->inputs) {
+				GC.get_variable(input).output.emplace(constraint->position);
 			}
+			constraint->enabled = true;
+			constraint->choosen = nullptr;
 		}
-		GC.get_constraint(constraint_position)->enabled = true;
-		GC.get_constraint(constraint_position)->choosen = nullptr;
 	}
 
   private:
@@ -107,115 +110,107 @@ class DeltaBlue {
 							   ConstraintGraph& GC) {
 		constraint->enabled = false;
 
-		if (pacanski_razvorot(constraint->position, GC)) {
+		if (reverse_path(&constraint, GC)) {
 			std::vector<int> colors(GC.constraints.size(), 0);
-			if (cycle_checker(constraint->position, GC, colors)) {
+			if (cycle_checker(constraint, GC, colors)) {
 				exit(1);
 			}
-			add_propogate(constraint->choosen->output, GC, nullptr);
+			add_propogate(GC.get_variable(constraint->choosen->output), GC,
+						  nullptr);
 		}
 	}
 
-	static bool pacanski_razvorot(size_t constraint_index,
-								  ConstraintGraph& GC) {
+	static bool reverse_path(std::unique_ptr<Constraint>* constraint,
+							 ConstraintGraph& GC) {
 		size_t force = 0;
-		size_t variable_position = 0;
-		for (Method& method : GC.constraints[constraint_index]->methods) {
-			if (GC.get_variable_const(method.output).force > force) {
-				variable_position = method.output;
-				GC.get_constraint(constraint_index)->choosen = &method;
-				force = GC.get_variable_const(variable_position).force;
+		Variable* variable = nullptr;
+		for (Method& method : (*constraint)->methods) {
+			variable = &GC.get_variable(method.output);
+			if (variable->force > force) {
+				(*constraint)->choosen = &method;
+				force = variable->force;
 			}
 		}
 		if (force == 0) {
 			exit(1); // это ужасно
 		}
 
-		if (force <= GC.constraints[constraint_index]->priority) {
+		if (force <= (*constraint)->priority) {
 			return false;
 		}
 
-		size_t blocked = variable_position;
-		for (size_t input :
-			 GC.get_constraint_const(constraint_index)->choosen->inputs) {
-			GC.variables[input].output.insert(constraint_index);
+		size_t blocked = variable->position;
+		for (size_t input : (*constraint)->choosen->inputs) {
+			GC.get_variable(input).output.insert((*constraint)->position);
 		}
-		std::swap(constraint_index,
-				  GC.get_variable(variable_position).determined_by);
+		size_t tmp = variable->determined_by;
+		variable->determined_by = (*constraint)->position;
+		constraint = &GC.get_constraint(tmp);
 
-		while (GC.get_constraint_const(constraint_index)->priority != force) {
-			for (const Method& method :
-				 GC.get_constraint_const(constraint_index)->methods) {
-				if (method.output != blocked &&
-					GC.get_variable_const(method.output).force == force) {
+		while ((*constraint)->priority != force) {
+			for (const Method& method : (*constraint)->methods) {
+				if (method.output != blocked && variable->force == force) {
 
-					variable_position = method.output;
-					GC.get_variable(variable_position)
-						.output.insert(
-							GC.get_variable(variable_position).determined_by);
-					GC.get_variable(variable_position)
-						.output.erase(constraint_index);
+					variable = &GC.get_variable(method.output);
+					variable->output.insert(variable->determined_by);
+					variable->output.erase((*constraint)->position);
 
-					std::swap(constraint_index,
-							  GC.get_variable(variable_position).determined_by);
+					size_t tmp = variable->determined_by;
+					variable->determined_by = (*constraint)->position;
+					constraint = &GC.get_constraint(tmp);
 				}
 			}
 		}
-		for (size_t input :
-			 GC.get_constraint_const(constraint_index)->choosen->inputs) {
-			GC.variables[input].output.emplace(constraint_index);
+		for (size_t input : (*constraint)->choosen->inputs) {
+			GC.get_variable(input).output.emplace((*constraint)->position);
 		}
-		GC.get_constraint_const(constraint_index)->choosen = nullptr;
+		(*constraint)->choosen = nullptr;
 		return true;
 	}
 
-	static bool cycle_checker(size_t constraint_index, ConstraintGraph& GC,
+	static bool cycle_checker(const std::unique_ptr<Constraint>& constraint,
+							  ConstraintGraph& GC,
 							  std::vector<int>& constraint_colors) {
-		constraint_colors[constraint_index] = 1;
-		size_t variable_index =
-			GC.constraints[constraint_index]->choosen->output;
-		for (size_t neighbor_constraint_index :
-			 GC.variables[variable_index].output) {
+		constraint_colors[constraint->position] = 1;
+		const Variable& variable =
+			GC.get_variable_const(constraint->choosen->output);
+		for (size_t neighbor_constraint_index : variable.output) {
 			if (constraint_colors[neighbor_constraint_index] == 0) {
-				if (cycle_checker(neighbor_constraint_index, GC,
-								  constraint_colors)) {
+				if (cycle_checker(
+						GC.get_constraint_const(neighbor_constraint_index), GC,
+						constraint_colors)) {
 					return true;
 				}
 			} else if (constraint_colors[neighbor_constraint_index] == 1) {
 				return true;
 			}
 		}
-		constraint_colors[constraint_index] = 2;
+		constraint_colors[constraint->position] = 2;
 		return false;
 	}
 
-	static void add_propogate(size_t variable_index, ConstraintGraph& GC,
+	static void add_propogate(Variable& variable, ConstraintGraph& GC,
 							  std::vector<bool>* visited) {
 		if (visited != nullptr) {
-			if ((*visited)[variable_index]) {
+			if ((*visited)[variable.position]) {
 				return;
 			}
-			(*visited)[variable_index] = true;
+			(*visited)[variable.position] = true;
 		}
-		size_t constraint_index =
-			GC.get_variable_const(variable_index).determined_by;
-		size_t force =
-			GC.get_constraint_const(
-				  GC.get_variable_const(variable_index).determined_by)
-				->priority;
-		for (const Method& method :
-			 GC.get_constraint_const(constraint_index)->methods) {
-			if (&method != GC.get_constraint_const(constraint_index)->choosen) {
+		const std::unique_ptr<Constraint>& constraint =
+			GC.get_constraint_const(variable.determined_by);
+		size_t force = constraint->priority;
+		for (const Method& method : constraint->methods) {
+			if (&method != constraint->choosen) {
 				force =
 					std::max(force, GC.get_variable_const(method.output).force);
 			}
 		}
-		GC.variables[variable_index].force = force;
+		variable.force = force;
 
-		for (size_t constraint_index : GC.variables[variable_index].output) {
-			add_propogate(
-				GC.get_constraint_const(constraint_index)->choosen->output, GC,
-				visited);
+		for (size_t constraint_index : variable.output) {
+			add_propogate(GC.get_variable(constraint->choosen->output), GC,
+						  visited);
 		}
 	}
 
@@ -223,7 +218,7 @@ class DeltaBlue {
 		std::vector<bool> visited(GC.variables.size(), false);
 		for (size_t i = 0; i < visited.size(); ++i) {
 			if (!visited[i]) {
-				add_propogate(i, GC, &visited);
+				add_propogate(GC.get_variable(i), GC, &visited);
 			}
 		}
 	}
