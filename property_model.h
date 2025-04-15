@@ -1,4 +1,6 @@
-#include "kernel/delta_blue.cpp"
+#pragma once
+
+#include "kernel/delta_blue.h"
 #include "library/binding.h"
 #include "library/indexing.h"
 #include <functional>
@@ -31,16 +33,14 @@ class Builder;
 template<typename... DataArgs, typename... ValueArgs, typename... OutputArgs>
 class PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 						OutputTypes<OutputArgs...>> {
-  public:
-	friend class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
-						 OutputTypes<OutputArgs...>>;
-	using PMImpl =
-		PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
-						  OutputTypes<OutputArgs...>>;
-	friend std::unique_ptr<PMImpl> std::make_unique<PMImpl>();
 	using DataTuple = DataTypes<DataArgs...>;
 	using ValueTuple = ValueTypes<ValueArgs...>;
 	using OutputTuple = OutputTypes<OutputArgs...>;
+
+  public:
+	friend class Builder<DataTuple, ValueTuple, OutputTuple>;
+	using PMImpl = PropertyModelImpl<DataTuple, ValueTuple, OutputTuple>;
+	friend std::unique_ptr<PMImpl> std::make_unique<PMImpl>();
 
 	template<typename R>
 	void update_variable(
@@ -48,6 +48,21 @@ class PropertyModelImpl<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 		Library::Getter<R>::get(data_, value_, output_) = std::move(value);
 		Kernel::DeltaBlue::changed_value(
 			Library::GetIndex<R>::get(data_, value_, output_), GC_);
+	}
+
+	void disable_constraint(size_t constraint_position) {
+		Kernel::DeltaBlue::disable_constraint(
+			GC_.get_constraint(constraint_position), GC_);
+	}
+
+	void enable_constraint(size_t constraint_position) {
+		Kernel::DeltaBlue::add_constraint(
+			GC_.get_constraint(constraint_position), GC_);
+	}
+
+	template<typename R>
+	Library::Type<R, DataTuple, ValueTuple, OutputTuple>& get() {
+		return Library::Getter<R>::get(data_, value_, output_);
 	}
 
   private:
@@ -129,16 +144,14 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 			std::move(value);
 	}
 
-	void new_constraint(size_t priority, bool IsStay = false) {
+	void new_constraint(size_t priority, bool disabled = false) {
 		if (!current_constraint_->methods.empty()) {
 			pm_->setConstraint(current_constraint_);
 		}
 		current_constraint_ = std::make_unique<Constraint>();
 		current_constraint_->priority = priority;
-		current_constraint_->IsStay = IsStay;
-		if (!current_constraint_->IsStay) {
-			current_constraint_->enabled = true;
-		}
+		current_constraint_->disabled = disabled;
+
 		if (priority > max_priority_) {
 			max_priority_ = priority;
 		}
@@ -172,19 +185,16 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
   private:
 	template<int mode, size_t Ind, typename... TupleArgs>
 	void make_stay(std::tuple<TupleArgs...>& variables) {
-		new_constraint(++max_priority_, true);
+		new_constraint(++max_priority_);
+		current_constraint_->IsStay = true;
 		auto& val = std::get<Ind>(variables);
 
-		switch (mode) {
-		case 0:
+		if constexpr (mode == 0) {
 			add_method<Library::Data<Ind>>([&val]() { return val; });
-			break;
-		case 1:
+		} else if constexpr (mode == 1) {
 			add_method<Library::Value<Ind>>([&val]() { return val; });
-		case 2:
+		} else if constexpr (mode == 2) {
 			add_method<Library::Output<Ind>>([&val]() { return val; });
-		default:
-			break;
 		}
 	}
 
@@ -206,29 +216,3 @@ class Builder<DataTypes<DataArgs...>, ValueTypes<ValueArgs...>,
 	size_t max_priority_ = 0;
 };
 } // namespace PropertyModel
-
-size_t m1(int a, double b) {
-	return a * b;
-}
-
-using namespace PropertyModel;
-
-int main() {
-	Builder<DataTypes<int, double>, ValueTypes<int, double>,
-			OutputTypes<int, double>>
-		builder;
-	builder.set<Library::Data<0>>(2);
-	builder.set<Library::Data<1>>(4.6);
-	builder.set<Library::Value<0>>(4);
-	builder.set<Library::Value<1>>(4.65);
-	builder.set<Library::Output<0>>(123456);
-	builder.set<Library::Output<1>>(1);
-
-	builder.new_constraint(1);
-	builder.add_method<Library::Output<0>, Library::Data<0>, Library::Data<1>>(
-		m1);
-
-	auto pm = builder.get();
-
-	return 0;
-}

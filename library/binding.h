@@ -1,7 +1,11 @@
+#pragma once
+
 #include "utils.h"
 #include <cstdio>
 #include <functional>
 #include <tuple>
+
+namespace PropertyModel {
 
 namespace Library {
 namespace Details {
@@ -97,4 +101,5 @@ struct Getter<Output<Ind>> {
 	}
 };
 
-} // namespace Library
+}; // namespace Library
+}; // namespace PropertyModel

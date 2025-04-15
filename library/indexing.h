@@ -1,8 +1,11 @@
+#pragma once
+
 #include "utils.h"
 #include <cstdio>
 #include <functional>
 #include <tuple>
 
+namespace PropertyModel {
 namespace Library {
 
 template<class A>
@@ -41,4 +44,5 @@ struct GetIndex<Output<Ind>> {
 			   std::tuple_size<std::tuple<ValueTypes...>>{};
 	}
 };
-} // namespace Library
+}; // namespace Library
+}; // namespace PropertyModel
